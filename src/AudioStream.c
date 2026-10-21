@@ -1,5 +1,9 @@
 #include "Limelight-internal.h"
 
+#if defined(__linux__) || defined(__ANDROID__)
+#include <sys/resource.h>
+#endif
+
 static SOCKET rtpSocket = INVALID_SOCKET;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
@@ -152,8 +156,16 @@ static bool queuePacketToLbq(PQUEUED_AUDIO_PACKET* packet) {
         else if (err == LBQ_BOUND_EXCEEDED) {
             Limelog("Audio packet queue overflow\n");
 
-            // The audio queue is full, so free all existing items and try again
-            freePacketList(LbqFlushQueueItems(&packetQueue));
+            // The audio queue is full. Drop the OLDEST packet only (5 ms) instead of
+            // flushing the whole queue (30 packets = 150 ms of silence).
+            void* oldest = NULL;
+            if (LbqPollQueueElement(&packetQueue, &oldest) == LBQ_SUCCESS && oldest) {
+                free(oldest);
+            }
+            else {
+                // Nothing to drop - fall back to flushing the queue.
+                freePacketList(LbqFlushQueueItems(&packetQueue));
+            }
         }
     } while (err == LBQ_BOUND_EXCEEDED);
 
@@ -383,6 +395,12 @@ static void AudioReceiveThreadProc(void* context) {
 static void AudioDecoderThreadProc(void* context) {
     int err;
     PQUEUED_AUDIO_PACKET packet;
+
+#if defined(__linux__) || defined(__ANDROID__)
+    // 音频解码线程跑在 nice 0,会被视频解码/绘制线程挤掉,一掉队音频队列就堆积,
+    // 触发 100 ms 阈值丢帧(可听的"咔哒")。往上调一档,失败也不影响功能。
+    setpriority(PRIO_PROCESS, 0, -10);
+#endif
 
     while (!PltIsThreadInterrupted(&decoderThread)) {
         err = LbqWaitForQueueElement(&packetQueue, (void**)&packet);
