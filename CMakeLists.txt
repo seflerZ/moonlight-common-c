@@ -16,6 +16,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ${CMAKE_POSITION_INDEPENDENT_CODE_BACKUP})
 unset(CMAKE_POSITION_INDEPENDENT_CODE_BACKUP)
 
 aux_source_directory(src SRC_LIST)
+list(APPEND SRC_LIST
+  nanors/rs.c
+  nanors/deps/obl/oblas_common.c
+  nanors/deps/obl/oblas_lite.c
+)
 
 # Build shared library by default, but allows user override
 if (NOT DEFINED BUILD_SHARED_LIBS)
