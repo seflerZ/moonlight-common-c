@@ -9,3 +9,6 @@ limelight-common/Release/
 *.sdf
 *.suo
 limelight-common/limelight-common.vcxproj.user
+
+# 看板工具的会话状态目录（别让它冒进提交列表）
+.memex/
